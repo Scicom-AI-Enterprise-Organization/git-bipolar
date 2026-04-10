@@ -23,8 +23,8 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Build & package all platforms
-        run: make release
+      - name: Build all platforms
+        run: make build-all
         env:
           VERSION: ${{ github.ref_name }}
 
@@ -35,8 +35,8 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
-            dist/bipolar-${{ github.ref_name }}-darwin-amd64.tar.gz
-            dist/bipolar-${{ github.ref_name }}-darwin-arm64.tar.gz
-            dist/bipolar-${{ github.ref_name }}-linux-amd64.tar.gz
-            dist/bipolar-${{ github.ref_name }}-linux-arm64.tar.gz
-            dist/bipolar-${{ github.ref_name }}-windows-amd64.zip
+            dist/bipolar-darwin-amd64
+            dist/bipolar-darwin-arm64
+            dist/bipolar-linux-amd64
+            dist/bipolar-linux-arm64
+            dist/bipolar-windows-amd64.exe

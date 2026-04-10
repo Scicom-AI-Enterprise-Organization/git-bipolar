@@ -30,16 +30,16 @@ It's a pure shell function — no daemon, no background process, no latency.
 
 **Apple Silicon (M1/M2/M3):**
 ```sh
-curl -L https://github.com/your-org/bipolar/releases/latest/download/bipolar-darwin-arm64.tar.gz | tar xz
-chmod +x bipolar-darwin-arm64
-sudo mv bipolar-darwin-arm64 /usr/local/bin/bipolar
+curl -L https://github.com/your-org/bipolar/releases/latest/download/bipolar-darwin-arm64 -o bipolar
+chmod +x bipolar
+sudo mv bipolar /usr/local/bin/bipolar
 ```
 
 **Intel:**
 ```sh
-curl -L https://github.com/your-org/bipolar/releases/latest/download/bipolar-darwin-amd64.tar.gz | tar xz
-chmod +x bipolar-darwin-amd64
-sudo mv bipolar-darwin-amd64 /usr/local/bin/bipolar
+curl -L https://github.com/your-org/bipolar/releases/latest/download/bipolar-darwin-amd64 -o bipolar
+chmod +x bipolar
+sudo mv bipolar /usr/local/bin/bipolar
 ```
 
 Verify:
@@ -53,16 +53,16 @@ bipolar --version
 
 **x86_64:**
 ```sh
-curl -L https://github.com/your-org/bipolar/releases/latest/download/bipolar-linux-amd64.tar.gz | tar xz
-chmod +x bipolar-linux-amd64
-sudo mv bipolar-linux-amd64 /usr/local/bin/bipolar
+curl -L https://github.com/your-org/bipolar/releases/latest/download/bipolar-linux-amd64 -o bipolar
+chmod +x bipolar
+sudo mv bipolar /usr/local/bin/bipolar
 ```
 
 **ARM64:**
 ```sh
-curl -L https://github.com/your-org/bipolar/releases/latest/download/bipolar-linux-arm64.tar.gz | tar xz
-chmod +x bipolar-linux-arm64
-sudo mv bipolar-linux-arm64 /usr/local/bin/bipolar
+curl -L https://github.com/your-org/bipolar/releases/latest/download/bipolar-linux-arm64 -o bipolar
+chmod +x bipolar
+sudo mv bipolar /usr/local/bin/bipolar
 ```
 
 Verify:
@@ -76,10 +76,9 @@ bipolar --version
 
 > **Requires Git Bash or WSL.** Native PowerShell / CMD are not supported — the shell function that bipolar installs is bash/zsh only.
 
-1. Download `bipolar-windows-amd64.zip` from the [Releases](../../releases) page
-2. Extract the `.exe`
-3. Move it somewhere on your `PATH`, e.g. `C:\Program Files\bipolar\bipolar.exe`
-4. Open **Git Bash** and run `bipolar`
+1. Download `bipolar-windows-amd64.exe` from the [Releases](../../releases) page
+2. Rename it to `bipolar.exe` and move it somewhere on your `PATH`, e.g. `C:\Program Files\bipolar\bipolar.exe`
+3. Open **Git Bash** and run `bipolar`
 
 ---
 

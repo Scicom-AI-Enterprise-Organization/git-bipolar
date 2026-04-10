@@ -36,20 +36,11 @@ build-all: clean
 	@echo "Binaries written to $(BUILD_DIR)/"
 	@ls -lh $(BUILD_DIR)/
 
-# ── Release archives (tar.gz / zip) ───────────────────────────────────────────
+# ── Release (raw binaries, no archiving) ─────────────────────────────────────
 
 release: build-all
-	@echo "Packaging release archives..."
-
-	cd $(BUILD_DIR) && tar czf $(BINARY)-$(VERSION)-darwin-amd64.tar.gz   $(BINARY)-darwin-amd64
-	cd $(BUILD_DIR) && tar czf $(BINARY)-$(VERSION)-darwin-arm64.tar.gz   $(BINARY)-darwin-arm64
-	cd $(BUILD_DIR) && tar czf $(BINARY)-$(VERSION)-linux-amd64.tar.gz    $(BINARY)-linux-amd64
-	cd $(BUILD_DIR) && tar czf $(BINARY)-$(VERSION)-linux-arm64.tar.gz    $(BINARY)-linux-arm64
-	cd $(BUILD_DIR) && zip     $(BINARY)-$(VERSION)-windows-amd64.zip     $(BINARY)-windows-amd64.exe
-
-	@echo ""
-	@echo "Release archives ready:"
-	@ls -lh $(BUILD_DIR)/*.tar.gz $(BUILD_DIR)/*.zip
+	@echo "Release binaries ready:"
+	@ls -lh $(BUILD_DIR)/
 
 # ── Tagging & versioning ─────────────────────────────────────────────────────
 #
