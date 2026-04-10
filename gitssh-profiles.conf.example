@@ -1,0 +1,7 @@
+[ProfileName]
+key_file=~/.ssh/path/to/keyfile/private
+org_pattern=<github org/github username pattern in regex, or just the actual string>
+
+[Default]
+key_file=~/.ssh/id_ed25519
+org_pattern=.*
