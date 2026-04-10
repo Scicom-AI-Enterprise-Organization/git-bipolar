@@ -30,14 +30,14 @@ It's a pure shell function — no daemon, no background process, no latency.
 
 **Apple Silicon (M1/M2/M3):**
 ```sh
-curl -L https://github.com/your-org/bipolar/releases/latest/download/bipolar-darwin-arm64 -o bipolar
+curl -L https://github.com/Scicom-AI-Enterprise-Organization/git-bipolar/releases/latest/download/bipolar-darwin-arm64 -o bipolar
 chmod +x bipolar
 sudo mv bipolar /usr/local/bin/bipolar
 ```
 
 **Intel:**
 ```sh
-curl -L https://github.com/your-org/bipolar/releases/latest/download/bipolar-darwin-amd64 -o bipolar
+curl -L https://github.com/Scicom-AI-Enterprise-Organization/git-bipolar/releases/latest/download/bipolar-darwin-amd64 -o bipolar
 chmod +x bipolar
 sudo mv bipolar /usr/local/bin/bipolar
 ```
@@ -53,14 +53,14 @@ bipolar --version
 
 **x86_64:**
 ```sh
-curl -L https://github.com/your-org/bipolar/releases/latest/download/bipolar-linux-amd64 -o bipolar
+curl -L https://github.com/Scicom-AI-Enterprise-Organization/git-bipolar/releases/latest/download/bipolar-linux-amd64 -o bipolar
 chmod +x bipolar
 sudo mv bipolar /usr/local/bin/bipolar
 ```
 
 **ARM64:**
 ```sh
-curl -L https://github.com/your-org/bipolar/releases/latest/download/bipolar-linux-arm64 -o bipolar
+curl -L https://github.com/Scicom-AI-Enterprise-Organization/git-bipolar/releases/latest/download/bipolar-linux-arm64 -o bipolar
 chmod +x bipolar
 sudo mv bipolar /usr/local/bin/bipolar
 ```
@@ -87,7 +87,7 @@ bipolar --version
 Requires Go 1.23+.
 
 ```sh
-git clone https://github.com/your-org/bipolar
+git clone https://github.com/Scicom-AI-Enterprise-Organization/git-bipolar
 cd bipolar
 make build
 # binary at bin/bipolar
