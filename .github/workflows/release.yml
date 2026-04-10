@@ -10,34 +10,33 @@ permissions:
 
 jobs:
   release:
-    name: Build & Release
+    name: Build & Publish Release
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # needed for git describe in VERSION
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
 
-      - name: Build all platforms
-        run: make build-all
-        env:
-          VERSION: ${{ github.ref_name }}
-
-      - name: Package archives
+      - name: Build & package all platforms
         run: make release
         env:
           VERSION: ${{ github.ref_name }}
 
-      - name: Create GitHub Release
+      - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
-            dist/*.tar.gz
-            dist/*.zip
+            dist/bipolar-${{ github.ref_name }}-darwin-amd64.tar.gz
+            dist/bipolar-${{ github.ref_name }}-darwin-arm64.tar.gz
+            dist/bipolar-${{ github.ref_name }}-linux-amd64.tar.gz
+            dist/bipolar-${{ github.ref_name }}-linux-arm64.tar.gz
+            dist/bipolar-${{ github.ref_name }}-windows-amd64.zip
