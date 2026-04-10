@@ -4,9 +4,7 @@
 
 If you juggle multiple GitHub accounts (personal, work, enterprise, client), you know the pain: wrong SSH key, `Permission denied`, stalled deploys. **bipolar** fixes that by transparently swapping your SSH identity based on the org in the remote URL — no wrappers, no per-repo config, no thinking required.
 
-```
-[Git-Bipolar] Org: acme-corp | Using Work Profile...
-```
+![downloadbipolaq](https://github.com/user-attachments/assets/7596e167-25bf-4de6-9d57-36c3fa8d59b1)
 
 ---
 
