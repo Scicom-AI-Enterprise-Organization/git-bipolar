@@ -158,6 +158,55 @@ The `git-dispatch` shell function requires bash or zsh. On Windows, bipolar work
 
 ---
 
+## Releasing
+
+Releases are automated via GitHub Actions. The workflow builds all platform binaries, packages them as archives, and publishes a GitHub Release with auto-generated notes.
+
+### Versioning
+
+bipolar follows [Semantic Versioning](https://semver.org/):
+
+```
+v<MAJOR>.<MINOR>.<PATCH>
+
+MAJOR — breaking change (e.g. config format change, removed feature)
+MINOR — new feature, backwards compatible
+PATCH — bug fix, backwards compatible
+```
+
+### Cutting a release
+
+Use `make tag` — it validates your environment before pushing anything:
+
+```sh
+make tag VERSION=v1.2.3
+```
+
+This will:
+1. Verify `VERSION` is set and follows semver
+2. Verify the working tree is clean (no uncommitted changes)
+3. Verify the tag doesn't already exist
+4. Create an annotated git tag and push it to origin
+5. Print a link to watch the Actions run
+
+The GitHub Actions [release workflow](.github/workflows/release.yml) then kicks in automatically and:
+- Cross-compiles for all 5 targets (darwin amd64/arm64, linux amd64/arm64, windows amd64)
+- Packages `.tar.gz` archives for mac/linux and a `.zip` for windows
+- Creates a GitHub Release with the archives attached and auto-generated release notes
+
+### If something goes wrong
+
+Delete the tag locally and remotely, fix the issue, then re-tag:
+
+```sh
+git tag -d v1.2.3
+git push origin :refs/tags/v1.2.3
+# fix things...
+make tag VERSION=v1.2.3
+```
+
+---
+
 ## Contributing
 
 PRs welcome. The codebase is small and straightforward:

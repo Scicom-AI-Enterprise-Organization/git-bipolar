@@ -5,7 +5,7 @@ BUILD_DIR := dist
 
 GOFILES := $(shell find . -name '*.go' -not -path './vendor/*')
 
-.PHONY: build build-all clean tidy lint release
+.PHONY: build build-all clean tidy lint release tag
 
 # ── Local build ───────────────────────────────────────────────────────────────
 
@@ -50,6 +50,35 @@ release: build-all
 	@echo ""
 	@echo "Release archives ready:"
 	@ls -lh $(BUILD_DIR)/*.tar.gz $(BUILD_DIR)/*.zip
+
+# ── Tagging & versioning ─────────────────────────────────────────────────────
+#
+# Usage:  make tag VERSION=v1.2.3
+#
+# Checks:
+#   - VERSION is provided and starts with "v"
+#   - working tree is clean (no uncommitted changes)
+#   - tag does not already exist
+# Then creates an annotated tag and pushes it, which triggers the release workflow.
+
+tag:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "ERROR: VERSION is required.  Usage: make tag VERSION=v1.2.3"; exit 1; \
+	fi
+	@echo "$(VERSION)" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]' || \
+		{ echo "ERROR: VERSION must start with 'v' and follow semver (e.g. v1.2.3)"; exit 1; }
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "ERROR: Working tree is dirty. Commit or stash your changes first."; exit 1; \
+	fi
+	@if git rev-parse "$(VERSION)" >/dev/null 2>&1; then \
+		echo "ERROR: Tag $(VERSION) already exists."; exit 1; \
+	fi
+	@echo "Creating annotated tag $(VERSION)..."
+	git tag -a $(VERSION) -m "Release $(VERSION)"
+	git push origin $(VERSION)
+	@echo ""
+	@echo "Tag $(VERSION) pushed. GitHub Actions will build and publish the release."
+	@echo "Watch progress at: https://github.com/$$(git remote get-url origin | sed 's/.*github.com[:/]//' | sed 's/\.git$$//')/actions"
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
 
