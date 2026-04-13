@@ -15,11 +15,22 @@ import (
 // RunMainMenu is the top-level interactive loop.
 func RunMainMenu() error {
 	for {
+		_, rcFile, err := shell.DetectShell()
+		if err != nil {
+			rcFile = ""
+		}
+
+		aliasesOption := "Install Git Short Aliases"
+		if rcFile != "" && shell.CheckAliasesInstalled(rcFile) {
+			aliasesOption = "Uninstall Git Short Aliases"
+		}
+
 		var choice string
 		prompt := &survey.Select{
 			Message: "Bipolar  —  Git SSH Profile Manager",
 			Options: []string{
 				"Configure Profiles",
+				aliasesOption,
 				"Repair Bipolar",
 				"Exit",
 			},
@@ -35,6 +46,10 @@ func RunMainMenu() error {
 			if err := runConfigureProfiles(); err != nil {
 				fmt.Printf("Error: %v\n", err)
 			}
+		case "Install Git Short Aliases":
+			runInstallAliases(rcFile)
+		case "Uninstall Git Short Aliases":
+			runUninstallAliases(rcFile)
 		case "Repair Bipolar":
 			runRepair()
 		case "Exit":
@@ -330,6 +345,64 @@ func runRepair() {
 	}
 
 	fmt.Println()
+}
+
+// ── Git Short Aliases ────────────────────────────────────────────────────────
+
+func runInstallAliases(rcFile string) {
+	if rcFile == "" {
+		fmt.Println("\033[31m✗ Could not detect shell rc file.\033[0m")
+		return
+	}
+
+	fmt.Printf("\nThe following aliases will be added to \033[1m%s\033[0m:\n\n", rcFile)
+	fmt.Println("  ga   →  git add")
+	fmt.Println("  gaa  →  git add --all")
+	fmt.Println("  gc   →  git commit")
+	fmt.Println("  gcm  →  git commit -m")
+	fmt.Println("  gp   →  git push")
+	fmt.Println("  gpl  →  git pull")
+	fmt.Println("  gst  →  git status")
+	fmt.Println("  gco  →  git checkout")
+	fmt.Println("  gb   →  git branch")
+	fmt.Println("  gd   →  git diff")
+	fmt.Println("  gl   →  git log --oneline")
+	fmt.Println()
+
+	var confirm bool
+	if err := survey.AskOne(&survey.Confirm{
+		Message: "Install git short aliases?",
+		Default: true,
+	}, &confirm); err != nil || !confirm {
+		return
+	}
+
+	if err := shell.InstallAliases(rcFile); err != nil {
+		fmt.Printf("\033[31m✗ Error: %v\033[0m\n\n", err)
+		return
+	}
+	fmt.Printf("\n\033[32m✓ Git aliases installed.\033[0m  Run: \033[1msource %s\033[0m\n\n", rcFile)
+}
+
+func runUninstallAliases(rcFile string) {
+	if rcFile == "" {
+		fmt.Println("\033[31m✗ Could not detect shell rc file.\033[0m")
+		return
+	}
+
+	var confirm bool
+	if err := survey.AskOne(&survey.Confirm{
+		Message: "Remove git short aliases?",
+		Default: false,
+	}, &confirm); err != nil || !confirm {
+		return
+	}
+
+	if err := shell.UninstallAliases(rcFile); err != nil {
+		fmt.Printf("\033[31m✗ Error: %v\033[0m\n\n", err)
+		return
+	}
+	fmt.Printf("\n\033[32m✓ Git aliases removed.\033[0m  Run: \033[1msource %s\033[0m\n\n", rcFile)
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

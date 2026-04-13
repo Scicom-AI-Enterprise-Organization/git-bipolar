@@ -198,6 +198,74 @@ func CreateDefaultProfilesConf() error {
 	return os.WriteFile(ProfilesConfPath(), []byte(""), 0600)
 }
 
+// ── Git Short Aliases ────────────────────────────────────────────────────────
+
+const AliasesBlockStart = "### Managed by Bipolar (Git Aliases) ###"
+const AliasesBlockEnd = "### Bipolar Git Aliases End ###"
+
+const aliasesContent = `alias ga='git add'
+alias gaa='git add --all'
+alias gc='git commit'
+alias gcm='git commit -m'
+alias gp='git push'
+alias gpl='git pull'
+alias gst='git status'
+alias gco='git checkout'
+alias gb='git branch'
+alias gd='git diff'
+alias gl='git log --oneline'`
+
+var AliasesBlock = AliasesBlockStart + "\n" + aliasesContent + "\n" + AliasesBlockEnd
+
+// CheckAliasesInstalled returns true if the aliases block marker is present in the rc file.
+func CheckAliasesInstalled(rcFile string) bool {
+	data, err := os.ReadFile(rcFile)
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(data), AliasesBlockStart)
+}
+
+// InstallAliases appends the aliases managed block to the rc file.
+func InstallAliases(rcFile string) error {
+	if CheckAliasesInstalled(rcFile) {
+		return nil
+	}
+	existing := ""
+	data, err := os.ReadFile(rcFile)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("cannot read %s: %w", rcFile, err)
+	}
+	if err == nil {
+		existing = string(data)
+	}
+	newContent := existing
+	if newContent != "" && !strings.HasSuffix(newContent, "\n") {
+		newContent += "\n"
+	}
+	newContent += "\n" + AliasesBlock + "\n"
+	return os.WriteFile(rcFile, []byte(newContent), 0644)
+}
+
+// UninstallAliases removes the aliases managed block from the rc file.
+func UninstallAliases(rcFile string) error {
+	data, err := os.ReadFile(rcFile)
+	if err != nil {
+		return fmt.Errorf("cannot read %s: %w", rcFile, err)
+	}
+	text := string(data)
+	startIdx := strings.Index(text, AliasesBlockStart)
+	endIdx := strings.Index(text, AliasesBlockEnd)
+	if startIdx < 0 || endIdx < 0 {
+		return nil
+	}
+	endIdx += len(AliasesBlockEnd)
+	// Trim the surrounding newline we added on install
+	removed := text[:startIdx] + text[endIdx:]
+	removed = strings.TrimRight(removed, "\n") + "\n"
+	return os.WriteFile(rcFile, []byte(removed), 0644)
+}
+
 // EnsureInstalled checks for the rc function block and profiles config,
 // silently installing any missing pieces on first run.
 func EnsureInstalled() error {
