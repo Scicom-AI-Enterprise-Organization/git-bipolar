@@ -25,7 +25,7 @@ const shellFunction = `git-dispatch() {
             remote_url=$(command git config --get remote.origin.url 2>/dev/null)
         fi
 
-        # DO NOT intercept if it's HTTPS (must contain @ or ssh://)
+        # Only intercept SSH remotes (must contain @ or ssh://)
         if [[ -n "$remote_url" ]] && [[ "$remote_url" =~ "@" || "$remote_url" =~ "ssh://" ]]; then
 
             if [[ -f "$conf_file" ]]; then
@@ -61,10 +61,32 @@ const shellFunction = `git-dispatch() {
                     fi
                 done < "$conf_file"
             fi
+
+        elif [[ -n "$remote_url" ]] && [[ "$remote_url" =~ ^https:// ]]; then
+            local ssh_url=$(echo "$remote_url" | sed -E 's|https://([^/]+)/(.+)|git@\1:\2|')
+            echo -e "\033[0;33m[Git-Bipolar]\033[0m Remote is HTTPS — Bipolar requires SSH to switch profiles."
+            printf "\033[0;35m[Git-Bipolar]\033[0m Convert remote to SSH (%s)? [y/N] " "$ssh_url"
+            local answer
+            read -r answer </dev/tty
+            if [[ "$answer" =~ ^[Yy]$ ]]; then
+                if [[ "$1" == "clone" ]]; then
+                    local new_args=()
+                    for arg in "$@"; do
+                        [[ "$arg" == "$remote_url" ]] && new_args+=("$ssh_url") || new_args+=("$arg")
+                    done
+                    git-dispatch "${new_args[@]}"
+                    return $?
+                else
+                    command git remote set-url origin "$ssh_url"
+                    echo -e "\033[32m[Git-Bipolar]\033[0m ✓ Remote updated to SSH. Re-running command..."
+                    git-dispatch "$@"
+                    return $?
+                fi
+            fi
         fi
     fi
 
-    # Fallback for non-network, HTTPS, or unmatched profiles
+    # Fallback for non-network or unmatched profiles
     command git "$@"
 }
 
