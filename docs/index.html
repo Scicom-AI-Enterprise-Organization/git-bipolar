@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>bipolar — web installer</title>
+<meta name="description" content="Configure git-bipolar profiles in your browser and get a one-liner that installs the shell block and writes ~/.git_profiles.conf. No CLI, no install." />
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#11151c; --panel-2:#0e1219; --border:#222a35;
+    --text:#e6edf3; --muted:#8b97a7; --faint:#5d6878;
+    --accent:#bc8cff; --accent-2:#d2a8ff; --accent-dim:#7c5cb0;
+    --green:#3fb950; --yellow:#d29922; --red:#f85149; --cyan:#39c5cf;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --radius:10px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:
+      radial-gradient(900px 500px at 85% -10%, rgba(188,140,255,.10), transparent 60%),
+      radial-gradient(700px 400px at -5% 0%, rgba(57,197,207,.06), transparent 55%),
+      var(--bg);
+    color:var(--text); font-family:var(--sans); line-height:1.55;
+    -webkit-font-smoothing:antialiased; min-height:100vh;
+  }
+  .wrap{max-width:980px; margin:0 auto; padding:40px 22px 90px;}
+  a{color:var(--accent-2); text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* Header */
+  header.hero{margin-bottom:30px}
+  .logo{display:flex; align-items:center; gap:12px; flex-wrap:wrap}
+  .logo h1{font-size:30px; margin:0; letter-spacing:-.5px; font-weight:700}
+  .logo .dot{width:13px;height:13px;border-radius:50%;
+    background:linear-gradient(135deg,var(--accent),var(--cyan));
+    box-shadow:0 0 0 4px rgba(188,140,255,.12)}
+  .badge{font:600 11px/1 var(--mono); color:var(--accent-2);
+    border:1px solid var(--accent-dim); padding:5px 8px; border-radius:999px;
+    text-transform:uppercase; letter-spacing:.8px; background:rgba(188,140,255,.08)}
+  .tagline{color:var(--muted); margin:14px 0 0; font-size:16px; max-width:70ch}
+  .tagline strong{color:var(--text); font-weight:600}
+
+  /* Panels */
+  .panel{background:linear-gradient(180deg,var(--panel),var(--panel-2));
+    border:1px solid var(--border); border-radius:var(--radius); padding:22px; margin:22px 0}
+  .panel > h2{margin:0 0 4px; font-size:17px; display:flex; align-items:center; gap:9px}
+  .panel > h2 .num{font:700 12px/1.6 var(--mono); color:var(--bg);
+    background:var(--accent); width:22px;height:22px; border-radius:6px;
+    display:inline-flex; align-items:center; justify-content:center}
+  .panel .sub{color:var(--muted); font-size:13.5px; margin:0 0 16px}
+
+  .note{border-left:3px solid var(--accent-dim); background:rgba(188,140,255,.06);
+    padding:11px 14px; border-radius:0 8px 8px 0; color:var(--muted); font-size:13px; margin:14px 0}
+  .note strong{color:var(--text)}
+  .note.warn{border-color:var(--yellow); background:rgba(210,153,34,.07)}
+  .note.good{border-color:var(--green); background:rgba(63,185,80,.07)}
+
+  /* Profile cards */
+  #profiles{display:flex; flex-direction:column; gap:16px}
+  .profile{border:1px solid var(--border); border-radius:var(--radius);
+    background:var(--panel-2); padding:16px; position:relative}
+  .profile .phead{display:flex; align-items:center; gap:10px; margin-bottom:14px}
+  .profile .order{font:600 12px/1 var(--mono); color:var(--faint);
+    border:1px solid var(--border); border-radius:6px; padding:5px 7px; min-width:26px; text-align:center}
+  .profile .pname-wrap{flex:1; min-width:0}
+  .profile .ctrls{display:flex; gap:6px}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:13px}
+  .field{display:flex; flex-direction:column; gap:5px; min-width:0}
+  .field.full{grid-column:1 / -1}
+  label{font-size:12px; color:var(--muted); font-weight:600; display:flex; gap:6px; align-items:center}
+  label .opt{color:var(--faint); font-weight:400; font-size:11px}
+  label .hint{color:var(--faint); font-weight:400}
+  input[type=text]{width:100%; background:var(--bg); border:1px solid var(--border);
+    color:var(--text); border-radius:7px; padding:9px 11px; font:13px/1.4 var(--mono);
+    transition:border-color .12s, box-shadow .12s}
+  input[type=text]:focus{outline:none; border-color:var(--accent-dim);
+    box-shadow:0 0 0 3px rgba(188,140,255,.14)}
+  input::placeholder{color:var(--faint)}
+  .sign-row{grid-column:1 / -1; border-top:1px dashed var(--border); padding-top:13px; margin-top:1px}
+  .check{display:flex; align-items:center; gap:9px; cursor:pointer; user-select:none; font-size:13px; color:var(--text)}
+  .check input{width:16px;height:16px; accent-color:var(--accent); cursor:pointer; margin:0}
+  .sign-detail{margin-top:12px; display:none}
+  .sign-detail.show{display:block}
+
+  /* Buttons */
+  button{font-family:var(--sans); cursor:pointer; border-radius:7px; border:1px solid var(--border);
+    background:var(--panel); color:var(--text); font-size:13px; padding:8px 13px; transition:all .12s}
+  button:hover{border-color:var(--accent-dim); color:var(--accent-2)}
+  button:active{transform:translateY(1px)}
+  button.primary{background:var(--accent); border-color:var(--accent); color:#1a0e2e; font-weight:600}
+  button.primary:hover{background:var(--accent-2); color:#1a0e2e}
+  button.icon{padding:6px 9px; font:13px/1 var(--mono); color:var(--muted)}
+  button.danger:hover{border-color:var(--red); color:var(--red)}
+  .row-actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:16px}
+
+  /* Output / code */
+  .tabs{display:flex; gap:4px; border-bottom:1px solid var(--border); margin-bottom:0}
+  .tab{background:none; border:none; border-bottom:2px solid transparent; border-radius:0;
+    color:var(--muted); padding:9px 14px; font-size:13px; font-weight:600}
+  .tab:hover{color:var(--text)}
+  .tab.active{color:var(--accent-2); border-bottom-color:var(--accent)}
+  .tabpane{display:none}
+  .tabpane.active{display:block}
+  .codebox{position:relative; margin-top:14px}
+  pre{margin:0; background:#06080c; border:1px solid var(--border); border-radius:8px;
+    padding:15px 16px; overflow-x:auto; font:12.5px/1.6 var(--mono); color:#cdd6e0;
+    white-space:pre; -webkit-overflow-scrolling:touch}
+  pre.wrap-soft{white-space:pre-wrap; word-break:break-all}
+  .copybtn{position:absolute; top:9px; right:9px; font-size:12px; padding:6px 11px;
+    background:var(--panel); border:1px solid var(--border)}
+  .copybtn.ok{border-color:var(--green); color:var(--green)}
+  details.preview{margin-top:14px}
+  details.preview summary{cursor:pointer; color:var(--muted); font-size:13px; font-weight:600; padding:4px 0}
+  details.preview summary:hover{color:var(--text)}
+  details.preview[open] summary{margin-bottom:8px}
+
+  .errlist{margin:14px 0 0; padding:0; list-style:none; display:flex; flex-direction:column; gap:6px}
+  .errlist li{color:var(--yellow); font-size:13px; font-family:var(--mono)}
+  .errlist li::before{content:"▲ "; color:var(--yellow)}
+
+  .saved-note{margin:14px 0 0; font-size:12.5px; color:var(--faint); display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  .saved-note #saved-msg{display:inline-flex; align-items:center; gap:6px}
+  button.linkish{background:none; border:none; padding:0; color:var(--muted); font-size:12.5px; text-decoration:underline}
+  button.linkish:hover{color:var(--accent-2)}
+
+  ol.steps{margin:0; padding-left:20px; color:var(--muted); font-size:13.5px}
+  ol.steps li{margin:7px 0}
+  ol.steps code, p code, li code, .inline-code{font:12.5px var(--mono); background:#06080c;
+    border:1px solid var(--border); border-radius:5px; padding:1px 6px; color:#cdd6e0}
+
+  footer{margin-top:40px; color:var(--faint); font-size:12.5px; text-align:center; line-height:1.8}
+  footer a{color:var(--muted)}
+  .kbd{font:11px var(--mono); border:1px solid var(--border); border-bottom-width:2px;
+    border-radius:5px; padding:1px 6px; color:var(--muted)}
+
+  @media (max-width:640px){
+    .wrap{padding:26px 15px 70px}
+    .grid{grid-template-columns:1fr}
+    .logo h1{font-size:25px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="logo">
+      <span class="dot"></span>
+      <h1>bipolar</h1>
+      <span class="badge">web installer · no CLI</span>
+    </div>
+    <p class="tagline">
+      A different SSH key per GitHub org — automatically. Configure your profiles below,
+      then paste <strong>one command</strong> into your terminal. It installs the
+      <code>git-dispatch</code> shell block and writes <code>~/.git_profiles.conf</code> for you.
+      The binary only ever did this setup — so here it is, fully in the browser.
+    </p>
+  </header>
+
+  <div class="note good">
+    <strong>Nothing leaves your machine.</strong> This page runs entirely in your browser and talks to no server.
+    The command only writes file <em>paths</em> into a config file and appends a shell function to your rc file —
+    it never reads, uploads, or touches the contents of your SSH keys. Everything it will do is shown in the
+    previews below before you run it.
+  </div>
+
+  <!-- ── 1. Profiles ─────────────────────────────────────────── -->
+  <section class="panel">
+    <h2><span class="num">1</span> Profiles</h2>
+    <p class="sub">
+      Each profile maps a GitHub org/username pattern to an SSH key (and optionally a commit identity + signing).
+      Profiles are matched <strong>top to bottom, first match wins</strong> — use the ↑ ↓ buttons to order them, and
+      keep a catch-all <code>.*</code> profile last if you want a fallback.
+    </p>
+
+    <div id="profiles"></div>
+
+    <div class="row-actions">
+      <button class="primary" id="add-profile">+ Add profile</button>
+      <button id="add-default">+ Add catch-all <code style="color:inherit">Default</code></button>
+      <button id="load-existing">Edit an existing config…</button>
+    </div>
+
+    <ul class="errlist" id="errors"></ul>
+
+    <p class="saved-note" id="saved-note">
+      <span id="saved-msg"></span>
+      <button id="clear-saved" class="linkish" hidden>Clear saved data</button>
+    </p>
+  </section>
+
+  <!-- ── 2. Options ──────────────────────────────────────────── -->
+  <section class="panel">
+    <h2><span class="num">2</span> Extras</h2>
+    <label class="check" style="margin-top:2px">
+      <input type="checkbox" id="opt-aliases" />
+      <span>Also install short git aliases
+        (<code class="inline-code">gst</code>, <code class="inline-code">gcm</code>,
+        <code class="inline-code">gp</code>, <code class="inline-code">gco</code>…)</span>
+    </label>
+    <details class="preview" id="aliases-preview-wrap">
+      <summary>What aliases?</summary>
+      <pre id="aliases-preview" class="wrap-soft"></pre>
+    </details>
+  </section>
+
+  <!-- ── 3. Generated config preview ─────────────────────────── -->
+  <section class="panel">
+    <h2><span class="num">3</span> Your <code>~/.git_profiles.conf</code></h2>
+    <p class="sub">This is exactly what will be written. You can also edit it directly later — bipolar re-reads it on every git command.</p>
+    <div class="codebox">
+      <pre id="conf-preview">(add a profile above)</pre>
+      <button class="copybtn" data-copy="conf-preview">Copy</button>
+    </div>
+    <details class="preview">
+      <summary>Show the shell block that gets added to your rc file</summary>
+      <pre id="block-preview" class="wrap-soft"></pre>
+    </details>
+  </section>
+
+  <!-- ── 4. Install ──────────────────────────────────────────── -->
+  <section class="panel">
+    <h2><span class="num">4</span> Install</h2>
+    <p class="sub">Pick whichever you trust more — they do the same thing. Requires <code>bash</code> or <code>zsh</code> and <code>openssl</code> (preinstalled on macOS &amp; most Linux). Re-running is safe: it skips the block if already present and backs up any existing config to <code>.bak</code>.</p>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="oneliner">One-liner</button>
+      <button class="tab" data-tab="script">Readable script</button>
+      <button class="tab" data-tab="manual">Manual</button>
+    </div>
+
+    <div class="tabpane active" data-pane="oneliner">
+      <p class="sub" style="margin-top:14px">Paste this into your terminal:</p>
+      <div class="codebox">
+        <pre id="oneliner" class="wrap-soft"></pre>
+        <button class="copybtn" data-copy="oneliner">Copy</button>
+      </div>
+      <p class="sub" style="margin-top:10px">The long string is just your config + shell block base64-encoded so special characters survive the paste. Decode it yourself with <code>… | openssl base64 -d</code> — it's exactly the previews above.</p>
+    </div>
+
+    <div class="tabpane" data-pane="script">
+      <p class="sub" style="margin-top:14px">Prefer to read every line first? Download and inspect, then run it:</p>
+      <div class="row-actions" style="margin-top:0 0 4px">
+        <button class="primary" id="download-script">⤓ Download install.sh</button>
+        <button id="copy-script">Copy script</button>
+      </div>
+      <div class="codebox">
+        <pre id="script" class="wrap-soft"></pre>
+      </div>
+      <p class="sub" style="margin-top:10px">Run with <code>sh install.sh</code> (or <code>chmod +x install.sh &amp;&amp; ./install.sh</code>).</p>
+    </div>
+
+    <div class="tabpane" data-pane="manual">
+      <ol class="steps" style="margin-top:16px">
+        <li>Open your rc file: <code>~/.zshrc</code> (zsh) or <code>~/.bashrc</code> (bash).</li>
+        <li>Paste the <strong>shell block</strong> from step 3 (“Show the shell block…”) at the end of the file.</li>
+        <li>Create <code>~/.git_profiles.conf</code> with the contents from step 3, then <code>chmod 600 ~/.git_profiles.conf</code>.</li>
+        <li>Reload your shell: <code>source ~/.zshrc</code> (or <code>~/.bashrc</code>).</li>
+        <li>Done — every <code>git push/pull/fetch/clone</code> now picks the right key automatically.</li>
+      </ol>
+    </div>
+
+    <div class="note" style="margin-top:18px">
+      <strong>Last step, every method:</strong> reload your shell so it takes effect now —
+      <code>source ~/.zshrc</code> or <code>source ~/.bashrc</code>.
+    </div>
+  </section>
+
+  <footer>
+    bipolar · a different SSH key per GitHub org, automatically ·
+    <a href="https://github.com/Scicom-AI-Enterprise-Organization/git-bipolar">source &amp; CLI on GitHub</a><br/>
+    Prefer the binary? It does the same setup with an interactive menu — see the repo's Installation section.
+  </footer>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     Canonical shell blocks, embedded byte-for-byte from
+     internal/shell/shell.go via `make sync-web` (scripts/sync-web.mjs).
+     Do NOT hand-edit the contents of the two scripts below.
+     ════════════════════════════════════════════════════════════════ -->
+<script type="text/plain" id="bipolar-block">
+### Managed by Bipolar ###
+git-dispatch() {
+    local network_cmds="push pull fetch clone"
+    local conf_file="$HOME/.git_profiles.conf"
+    local remote_url=""
+
+    # Identify the URL
+    if [[ "$1" == "clone" ]]; then
+        for arg in "$@"; do [[ "$arg" =~ ":" || "$arg" =~ "/" ]] && remote_url="$arg"; done
+    else
+        remote_url=$(command git config --get remote.origin.url 2>/dev/null)
+    fi
+
+    if [[ -n "$remote_url" ]] && [[ -f "$conf_file" ]]; then
+        local org_name=$(echo "$remote_url" | sed -E 's/.*[:\/]([^\/]+)\/[^\/]+$/\1/')
+        local current_profile="" key_file="" git_name="" git_email="" sign="" sign_key="" org_pattern=""
+
+        # Parse with compatibility for Zsh/Bash
+        while read -r line || [[ -n "$line" ]]; do
+            if echo "$line" | grep -q "^\[.*\]$"; then
+                current_profile=$(echo "$line" | tr -d '[]')
+                key_file="" git_name="" git_email="" sign="" sign_key="" org_pattern=""
+            elif echo "$line" | grep -q "^key_file="; then
+                key_file=$(echo "$line" | cut -d'=' -f2- | xargs)
+            elif echo "$line" | grep -q "^git_name="; then
+                git_name=$(echo "$line" | cut -d'=' -f2-)
+            elif echo "$line" | grep -q "^git_email="; then
+                git_email=$(echo "$line" | cut -d'=' -f2-)
+            elif echo "$line" | grep -q "^sign="; then
+                sign=$(echo "$line" | cut -d'=' -f2- | xargs)
+            elif echo "$line" | grep -q "^sign_key="; then
+                sign_key=$(echo "$line" | cut -d'=' -f2- | xargs)
+            elif echo "$line" | grep -q "^org_pattern="; then
+                org_pattern=$(echo "$line" | cut -d'=' -f2- | xargs)
+
+                if [[ "$org_name" =~ $org_pattern ]]; then
+                    if [[ "$current_profile" != "Default" ]]; then
+                        local sign_note=""
+                        [[ "$sign" == "true" && -n "$sign_key" ]] && sign_note="  \033[0;32m🔏 signing on\033[0m"
+                        echo -e "\033[0;35m[Git-Bipolar]\033[0m Org: \033[1m$org_name\033[0m | Using \033[0;36m$current_profile\033[0m Profile...${sign_note}"
+                    fi
+
+                    # Build identity override args (-c is git's highest-precedence layer,
+                    # overriding both local .git/config and global ~/.gitconfig)
+                    local id_args=()
+                    [[ -n "$git_name" ]] && id_args+=(-c "user.name=$git_name")
+                    [[ -n "$git_email" ]] && id_args+=(-c "user.email=$git_email")
+
+                    # Commit signing (SSH): inject signing config and show an indicator
+                    if [[ "$sign" == "true" && -n "$sign_key" ]]; then
+                        eval local expanded_sign_key="$sign_key"
+                        id_args+=(-c "gpg.format=ssh" -c "user.signingkey=$expanded_sign_key" -c "commit.gpgsign=true" -c "tag.gpgsign=true")
+                        case "$1" in
+                            commit|tag|merge|rebase|cherry-pick|revert|am|commit-tree)
+                                echo -e "\033[0;35m[Git-Bipolar]\033[0m \033[0;32m🔏 Signing commit with\033[0m \033[1m$sign_key\033[0m" ;;
+                        esac
+                    fi
+
+                    # SSH network commands: inject key + identity
+                    if [[ " $network_cmds " =~ " $1 " ]] && [[ "$remote_url" =~ "@" || "$remote_url" =~ "ssh://" ]]; then
+                        eval local expanded_key_path="$key_file"
+                        if [[ -f "$expanded_key_path" ]]; then
+                            GIT_SSH_COMMAND="ssh -i $expanded_key_path -o IdentitiesOnly=yes" command git "${id_args[@]}" "$@"
+                            return $?
+                        else
+                            echo -e "\033[0;33m[Git-Bipolar]\033[0m Warning: key file not found: $expanded_key_path — falling back to system default"
+                        fi
+                    fi
+
+                    # All other commands: inject identity if configured
+                    if [[ ${#id_args[@]} -gt 0 ]]; then
+                        command git "${id_args[@]}" "$@"
+                        return $?
+                    fi
+
+                    command git "$@"
+                    return $?
+                fi
+            fi
+        done < "$conf_file"
+    fi
+
+    # Fallback for unmatched profiles or no remote
+    command git "$@"
+}
+
+alias git='git-dispatch'
+### Bipolar End ###
+</script>
+<script type="text/plain" id="bipolar-aliases">
+### Managed by Bipolar (Git Aliases) ###
+alias ga='git add'
+alias gaa='git add --all'
+alias gc='git commit'
+alias gcm='git commit -m'
+alias gp='git push'
+alias gpl='git pull'
+alias gst='git status'
+alias gco='git checkout'
+alias gb='git branch'
+alias gd='git diff'
+alias gl='git log --oneline'
+### Bipolar Git Aliases End ###
+</script>
+
+<script>
+(function(){
+  "use strict";
+
+  // Canonical blocks (synced from the Go source). .trim() matches the CLI's
+  // strings.TrimSpace comparison so the binary's "Repair" sees it as up-to-date.
+  var BLOCK   = document.getElementById('bipolar-block').textContent.trim();
+  var ALIASES = document.getElementById('bipolar-aliases').textContent.trim();
+  var BLOCK_MARKER   = "### Managed by Bipolar ###";
+  var ALIASES_MARKER = "### Managed by Bipolar (Git Aliases) ###";
+
+  document.getElementById('block-preview').textContent = BLOCK || '(block not synced — run `make sync-web`)';
+  document.getElementById('aliases-preview').textContent = ALIASES || '(aliases not synced)';
+
+  // ── State ────────────────────────────────────────────────────────
+  var profiles = [];   // {name, org, key, gname, gemail, sign, signSame, signKey}
+  var seq = 0;
+
+  function blank(name, org, key){
+    return {id:++seq, name:name||'', org:org||'', key:key||'',
+            gname:'', gemail:'', sign:false, signSame:true, signKey:''};
+  }
+
+  // Coerce any stored/parsed object into a well-formed state profile.
+  function normalize(o){
+    o = o || {};
+    return {id:++seq,
+            name:String(o.name||''), org:String(o.org||''), key:String(o.key||''),
+            gname:String(o.gname||''), gemail:String(o.gemail||''),
+            sign:!!o.sign, signSame:o.signSame !== false, signKey:String(o.signKey||'')};
+  }
+
+  // ── Local persistence (a copy lives in this browser, no server) ──
+  var STORAGE_KEY = 'bipolar.config.v1';
+  function storageOK(){
+    try { var k='__bp_test__'; localStorage.setItem(k,'1'); localStorage.removeItem(k); return true; }
+    catch(e){ return false; }
+  }
+  var CAN_SAVE = storageOK();
+
+  function save(){
+    if (!CAN_SAVE) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        v: 1,
+        aliases: !!document.getElementById('opt-aliases').checked,
+        profiles: profiles.map(function(p){
+          return {name:p.name, org:p.org, key:p.key, gname:p.gname,
+                  gemail:p.gemail, sign:p.sign, signSame:p.signSame, signKey:p.signKey};
+        })
+      }));
+      setSaved('saved');
+    } catch(e){ /* quota / disabled — non-fatal */ }
+  }
+  function loadSaved(){
+    if (!CAN_SAVE) return null;
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      var data = JSON.parse(raw);
+      if (!data || !Array.isArray(data.profiles)) return null;
+      return { aliases: !!data.aliases, profiles: data.profiles.map(normalize) };
+    } catch(e){ return null; }
+  }
+  function clearSaved(){
+    try { localStorage.removeItem(STORAGE_KEY); } catch(e){}
+  }
+
+  // Status line under the profiles list.
+  function setSaved(){
+    var msg = document.getElementById('saved-msg');
+    var btn = document.getElementById('clear-saved');
+    if (!CAN_SAVE){
+      msg.textContent = 'This browser blocks local storage — your edits won’t be remembered between visits.';
+      btn.hidden = true; return;
+    }
+    msg.textContent = '💾 Saved in this browser — your profiles will be here when you come back.';
+    btn.hidden = false;
+  }
+
+  // ── UTF-8 safe base64 ────────────────────────────────────────────
+  function toB64(str){
+    var bytes = new TextEncoder().encode(str);
+    var bin = '';
+    for (var i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+
+  // ── Build ~/.git_profiles.conf (mirrors profiles.go Save) ────────
+  function buildConf(){
+    var out = [];
+    profiles.forEach(function(p){
+      var b = [];
+      b.push('[' + p.name + ']');
+      b.push('key_file=' + p.key);
+      if (p.gname.trim())  b.push('git_name='  + p.gname.trim());
+      if (p.gemail.trim()) b.push('git_email=' + p.gemail.trim());
+      if (p.sign){
+        b.push('sign=true');
+        var sk = p.signSame ? p.key : p.signKey;
+        if (sk.trim()) b.push('sign_key=' + sk.trim());
+      }
+      b.push('org_pattern=' + p.org);
+      out.push(b.join('\n'));
+    });
+    return out.length ? out.join('\n\n') + '\n' : '';
+  }
+
+  // ── Validation (mirrors profiles.go ValidateSyntax) ──────────────
+  function validate(){
+    var issues = [];
+    var seen = {};
+    profiles.forEach(function(p, i){
+      var label = p.name.trim() ? '[' + p.name.trim() + ']' : '(profile #' + (i+1) + ')';
+      if (!p.name.trim())  issues.push(label + ' needs a name');
+      else if (seen[p.name.trim()]) issues.push('duplicate profile name: ' + p.name.trim());
+      seen[p.name.trim()] = true;
+      if (!p.key.trim())   issues.push(label + ' is missing an SSH key file path');
+      if (!p.org.trim())   issues.push(label + ' is missing an org/username pattern');
+      if (p.sign && !p.signSame && !p.signKey.trim())
+        issues.push(label + ' has signing on but no signing key');
+    });
+    return issues;
+  }
+
+  // ── The one-liner (base64 payload, openssl decode) ───────────────
+  function buildOneLiner(){
+    var withAliases = document.getElementById('opt-aliases').checked;
+    var parts = [];
+    parts.push("B='" + toB64(BLOCK) + "'");
+    parts.push("C='" + toB64(buildConf()) + "'");
+    if (withAliases) parts.push("A='" + toB64(ALIASES) + "'");
+    parts.push('case "$SHELL" in *zsh) R="$HOME/.zshrc";; *bash) if [ -f "$HOME/.bashrc" ]; then R="$HOME/.bashrc"; elif [ -f "$HOME/.bash_profile" ]; then R="$HOME/.bash_profile"; else R="$HOME/.bashrc"; fi;; *) R="$HOME/.profile";; esac');
+    parts.push('touch "$R"');
+    parts.push("grep -q '" + BLOCK_MARKER + "' \"$R\" || printf '\\n%s\\n' \"$(printf %s \"$B\" | openssl base64 -d -A)\" >> \"$R\"");
+    if (withAliases)
+      parts.push("grep -q '" + ALIASES_MARKER + "' \"$R\" || printf '\\n%s\\n' \"$(printf %s \"$A\" | openssl base64 -d -A)\" >> \"$R\"");
+    parts.push('F="$HOME/.git_profiles.conf"');
+    parts.push('[ -f "$F" ] && cp "$F" "$F.bak"');
+    parts.push('printf %s "$C" | openssl base64 -d -A > "$F"');
+    parts.push('chmod 600 "$F"');
+    parts.push('echo "[bipolar] installed. Reload your shell: source $R"');
+    return parts.join('; ');
+  }
+
+  // ── The readable install.sh (quoted heredocs, no base64) ─────────
+  function buildScript(){
+    var withAliases = document.getElementById('opt-aliases').checked;
+    var conf = buildConf().replace(/\n$/, '');   // heredoc re-adds the trailing newline
+    var L = [];
+    L.push('#!/usr/bin/env sh');
+    L.push('# bipolar installer — generated by the web configurator.');
+    L.push('# Inspect freely: it appends a shell function to your rc file and writes ~/.git_profiles.conf.');
+    L.push('set -e');
+    L.push('');
+    L.push('case "$SHELL" in');
+    L.push('  *zsh)  RC="$HOME/.zshrc" ;;');
+    L.push('  *bash) if [ -f "$HOME/.bashrc" ]; then RC="$HOME/.bashrc"; elif [ -f "$HOME/.bash_profile" ]; then RC="$HOME/.bash_profile"; else RC="$HOME/.bashrc"; fi ;;');
+    L.push('  *)     RC="$HOME/.profile" ;;');
+    L.push('esac');
+    L.push('touch "$RC"');
+    L.push('');
+    L.push('if grep -q \'' + BLOCK_MARKER + '\' "$RC"; then');
+    L.push('  echo "git-dispatch block already present in $RC (skipping)"');
+    L.push('else');
+    L.push("  cat >> \"$RC\" <<'BIPOLAR_BLOCK_EOF'");
+    L.push('');
+    L.push(BLOCK);
+    L.push('BIPOLAR_BLOCK_EOF');
+    L.push('  echo "Installed git-dispatch block into $RC"');
+    L.push('fi');
+    if (withAliases){
+      L.push('');
+      L.push('if grep -q \'' + ALIASES_MARKER + '\' "$RC"; then');
+      L.push('  echo "git aliases already present in $RC (skipping)"');
+      L.push('else');
+      L.push("  cat >> \"$RC\" <<'BIPOLAR_ALIASES_EOF'");
+      L.push('');
+      L.push(ALIASES);
+      L.push('BIPOLAR_ALIASES_EOF');
+      L.push('  echo "Installed git aliases into $RC"');
+      L.push('fi');
+    }
+    L.push('');
+    L.push('CONF="$HOME/.git_profiles.conf"');
+    L.push('if [ -f "$CONF" ]; then cp "$CONF" "$CONF.bak"; echo "Backed up existing config to $CONF.bak"; fi');
+    L.push("cat > \"$CONF\" <<'BIPOLAR_CONF_EOF'");
+    if (conf) L.push(conf);
+    L.push('BIPOLAR_CONF_EOF');
+    L.push('chmod 600 "$CONF"');
+    L.push('echo "Wrote profiles to $CONF"');
+    L.push('');
+    L.push('echo ""');
+    L.push('echo "Done. Reload your shell now:  source $RC"');
+    return L.join('\n') + '\n';
+  }
+
+  // ── Render the profile cards ─────────────────────────────────────
+  var profilesEl = document.getElementById('profiles');
+
+  function render(){
+    profilesEl.innerHTML = '';
+    if (!profiles.length){
+      var empty = document.createElement('p');
+      empty.className = 'sub';
+      empty.style.margin = '4px 0 0';
+      empty.textContent = 'No profiles yet. Add one to get started.';
+      profilesEl.appendChild(empty);
+    }
+    profiles.forEach(function(p, idx){
+      profilesEl.appendChild(card(p, idx));
+    });
+    refresh();
+  }
+
+  function field(labelHtml, value, oninput, placeholder){
+    var f = document.createElement('div'); f.className = 'field';
+    var l = document.createElement('label'); l.innerHTML = labelHtml;
+    var i = document.createElement('input'); i.type = 'text';
+    i.value = value || ''; if (placeholder) i.placeholder = placeholder;
+    i.addEventListener('input', function(){ oninput(i.value); refresh(); });
+    f.appendChild(l); f.appendChild(i); return f;
+  }
+
+  function card(p, idx){
+    var el = document.createElement('div'); el.className = 'profile';
+
+    var head = document.createElement('div'); head.className = 'phead';
+    var ord = document.createElement('span'); ord.className = 'order'; ord.textContent = (idx+1);
+    var nameWrap = document.createElement('div'); nameWrap.className = 'pname-wrap';
+    nameWrap.appendChild(field('Profile name', p.name,
+      function(v){ p.name = v; }, 'Work'));
+    var ctrls = document.createElement('div'); ctrls.className = 'ctrls';
+    ctrls.appendChild(btn('↑', 'icon', function(){ move(idx,-1); }, idx===0));
+    ctrls.appendChild(btn('↓', 'icon', function(){ move(idx, 1); }, idx===profiles.length-1));
+    ctrls.appendChild(btn('✕', 'icon danger', function(){ profiles.splice(idx,1); render(); }, false));
+    head.appendChild(ord); head.appendChild(nameWrap); head.appendChild(ctrls);
+    el.appendChild(head);
+
+    var grid = document.createElement('div'); grid.className = 'grid';
+
+    var orgF = field('Org / username pattern <span class="hint">(string or regex)</span>',
+      p.org, function(v){ p.org = v; }, 'acme-corp   ·   ^(acme|widgets)$   ·   .*');
+    orgF.classList.add('full');
+    grid.appendChild(orgF);
+
+    var keyF = field('SSH key file', p.key,
+      function(v){ p.key = v; }, '~/.ssh/id_ed25519_work');
+    keyF.classList.add('full');
+    grid.appendChild(keyF);
+
+    grid.appendChild(field('Git <code class="inline-code" style="font-size:11px">user.name</code> <span class="opt">optional</span>',
+      p.gname, function(v){ p.gname = v; }, 'Jane Work'));
+    grid.appendChild(field('Git <code class="inline-code" style="font-size:11px">user.email</code> <span class="opt">optional</span>',
+      p.gemail, function(v){ p.gemail = v; }, 'jane@acme-corp.com'));
+
+    // Signing
+    var signRow = document.createElement('div'); signRow.className = 'sign-row';
+    var signLabel = document.createElement('label'); signLabel.className = 'check';
+    var signCb = document.createElement('input'); signCb.type = 'checkbox'; signCb.checked = p.sign;
+    var signTxt = document.createElement('span');
+    signTxt.innerHTML = 'Sign commits &amp; tags with SSH <span class="opt" style="margin-left:4px">opt-in · requires git 2.34+</span>';
+    signLabel.appendChild(signCb); signLabel.appendChild(signTxt);
+    signRow.appendChild(signLabel);
+
+    var detail = document.createElement('div'); detail.className = 'sign-detail' + (p.sign ? ' show' : '');
+    var sameLabel = document.createElement('label'); sameLabel.className = 'check'; sameLabel.style.fontSize='12.5px';
+    var sameCb = document.createElement('input'); sameCb.type='checkbox'; sameCb.checked = p.signSame;
+    var sameTxt = document.createElement('span'); sameTxt.textContent = "Use this profile's SSH key to sign";
+    sameLabel.appendChild(sameCb); sameLabel.appendChild(sameTxt);
+    detail.appendChild(sameLabel);
+
+    var skField = field('Signing key', p.signKey, function(v){ p.signKey = v; }, '~/.ssh/id_ed25519_sign');
+    skField.style.marginTop = '11px';
+    skField.style.display = p.signSame ? 'none' : 'flex';
+    detail.appendChild(skField);
+
+    signCb.addEventListener('change', function(){
+      p.sign = signCb.checked; detail.classList.toggle('show', p.sign); refresh();
+    });
+    sameCb.addEventListener('change', function(){
+      p.signSame = sameCb.checked; skField.style.display = p.signSame ? 'none' : 'flex'; refresh();
+    });
+    signRow.appendChild(detail);
+    grid.appendChild(signRow);
+
+    el.appendChild(grid);
+    return el;
+  }
+
+  function btn(txt, cls, fn, disabled){
+    var b = document.createElement('button'); b.className = cls; b.textContent = txt;
+    b.disabled = !!disabled; if (disabled) b.style.opacity = .35;
+    b.addEventListener('click', fn); return b;
+  }
+
+  function move(idx, dir){
+    var j = idx + dir;
+    if (j < 0 || j >= profiles.length) return;
+    var t = profiles[idx]; profiles[idx] = profiles[j]; profiles[j] = t;
+    render();
+  }
+
+  // ── Refresh all outputs ──────────────────────────────────────────
+  function refresh(){
+    var conf = buildConf();
+    document.getElementById('conf-preview').textContent = conf || '(add a profile above)';
+    var issues = validate();
+    var errEl = document.getElementById('errors');
+    errEl.innerHTML = '';
+    issues.forEach(function(msg){
+      var li = document.createElement('li'); li.textContent = msg; errEl.appendChild(li);
+    });
+    document.getElementById('oneliner').textContent = buildOneLiner();
+    document.getElementById('script').textContent = buildScript();
+    save();
+  }
+
+  // ── Parse an existing config (mirrors profiles.go Load) ──────────
+  function parseConf(text){
+    var result = [], cur = null;
+    text.split('\n').forEach(function(raw){
+      var line = raw.trim();
+      if (line.charAt(0) === '[' && line.charAt(line.length-1) === ']'){
+        if (cur) result.push(cur);
+        cur = blank(line.slice(1, -1));
+      } else if (cur){
+        var eq = line.indexOf('=');
+        if (eq < 0) return;
+        var k = line.slice(0, eq), v = line.slice(eq+1).trim();
+        if (k === 'key_file') cur.key = v;
+        else if (k === 'git_name') cur.gname = v;
+        else if (k === 'git_email') cur.gemail = v;
+        else if (k === 'sign') cur.sign = /^true$/i.test(v);
+        else if (k === 'sign_key'){ cur.signKey = v; cur.signSame = false; }
+        else if (k === 'org_pattern') cur.org = v;
+      }
+    });
+    if (cur) result.push(cur);
+    result.forEach(function(p){ if (p.sign && p.signKey && p.signKey === p.key){ p.signSame = true; } });
+    return result;
+  }
+
+  // ── Wire up controls ─────────────────────────────────────────────
+  document.getElementById('add-profile').addEventListener('click', function(){
+    profiles.push(blank()); render();
+    profilesEl.lastElementChild.querySelector('input').focus();
+  });
+  document.getElementById('add-default').addEventListener('click', function(){
+    profiles.push(blank('Default', '.*')); render();
+  });
+  document.getElementById('load-existing').addEventListener('click', function(){
+    var text = window.prompt('Paste the contents of your ~/.git_profiles.conf to load and edit:');
+    if (text == null) return;
+    var parsed = parseConf(text);
+    if (!parsed.length){ alert('No profiles found in that text.'); return; }
+    profiles = parsed; render();
+  });
+  document.getElementById('opt-aliases').addEventListener('change', refresh);
+  document.getElementById('clear-saved').addEventListener('click', function(){
+    if (!confirm('Remove the locally saved profiles from this browser and reset the form?')) return;
+    clearSaved();
+    seq = 0;
+    profiles = [blank('Work', 'acme-corp', '~/.ssh/id_ed25519_work')];
+    document.getElementById('opt-aliases').checked = false;
+    render();          // re-renders, then auto-saves the fresh starter example
+  });
+
+  // Tabs
+  document.querySelectorAll('.tab').forEach(function(t){
+    t.addEventListener('click', function(){
+      document.querySelectorAll('.tab').forEach(function(x){ x.classList.remove('active'); });
+      document.querySelectorAll('.tabpane').forEach(function(x){ x.classList.remove('active'); });
+      t.classList.add('active');
+      document.querySelector('.tabpane[data-pane="' + t.dataset.tab + '"]').classList.add('active');
+    });
+  });
+
+  // Copy buttons
+  function flash(b){ var o=b.textContent; b.textContent='Copied ✓'; b.classList.add('ok');
+    setTimeout(function(){ b.textContent=o; b.classList.remove('ok'); }, 1400); }
+  function copyText(text, b){
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ flash(b); }, function(){ legacyCopy(text, b); });
+    } else { legacyCopy(text, b); }
+  }
+  function legacyCopy(text, b){
+    var ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta);
+    ta.select(); try{ document.execCommand('copy'); flash(b); }catch(e){} document.body.removeChild(ta);
+  }
+  document.querySelectorAll('.copybtn').forEach(function(b){
+    b.addEventListener('click', function(){
+      copyText(document.getElementById(b.dataset.copy).textContent, b);
+    });
+  });
+  document.getElementById('copy-script').addEventListener('click', function(){
+    copyText(buildScript(), this);
+  });
+
+  // Download install.sh
+  document.getElementById('download-script').addEventListener('click', function(){
+    var blob = new Blob([buildScript()], {type:'text/x-shellscript'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a'); a.href = url; a.download = 'install.sh';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  });
+
+  // ── Init: restore the locally saved copy, else seed an example ───
+  var restored = loadSaved();
+  if (restored && restored.profiles.length){
+    profiles = restored.profiles;
+    document.getElementById('opt-aliases').checked = restored.aliases;
+  } else {
+    profiles = [blank('Work', 'acme-corp', '~/.ssh/id_ed25519_work')];
+  }
+  setSaved();
+  render();
+})();
+</script>
+</body>
+</html>

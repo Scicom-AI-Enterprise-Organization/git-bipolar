@@ -22,6 +22,30 @@ It's a pure shell function — no daemon, no background process, no latency.
 
 ---
 
+## No-install method (web) ⚡
+
+Don't want to download anything? **You don't have to.** The binary only ever did two things — drop a shell function into your rc file and write a config file — so we put that in the browser.
+
+→ **[Open the web installer](https://scicom-ai-enterprise-organization.github.io/git-bipolar/)**
+
+1. Add your profiles in the form — org/username pattern, SSH key path, optional commit identity and signing.
+2. Copy the generated **one-liner** into your terminal (or download `install.sh` and read every line first).
+3. Reload your shell: `source ~/.zshrc` (or `~/.bashrc`).
+
+Done — every `git push/pull/fetch/clone` is now intercepted, exactly as if you'd used the binary.
+
+**It's safe by construction.** The page runs entirely client-side and talks to no server. The command it generates only writes file *paths* into `~/.git_profiles.conf` and appends the managed `git-dispatch` block to your rc file — it never reads, uploads, or touches the contents of your SSH keys. Everything it will do is shown in the previews on the page before you run anything.
+
+Your profiles are also **saved locally in your browser** (via `localStorage`), so you can close the tab and come back later to tweak them — nothing is sent anywhere, and a one-click **Clear saved data** wipes that copy.
+
+The block it installs is **byte-for-byte identical** to the one the binary ships (CI enforces this), so the two are interchangeable: install via the web today, manage with the binary later, or never touch the binary at all.
+
+> Requires `bash`/`zsh` and `openssl` (preinstalled on macOS and most Linux). On Windows, use Git Bash or WSL.
+
+The binary below is still handy if you prefer an **interactive menu**, a built-in SSH-key file browser, and the **Repair** diagnostic — but it's entirely optional.
+
+---
+
 ## Installation
 
 ### macOS
@@ -287,18 +311,37 @@ make tag VERSION=v1.2.3
 PRs welcome. The codebase is small and straightforward:
 
 ```
-cmd/bipolar/main.go          entry point
-internal/shell/shell.go      shell detection, rc file management, embedded function
+cmd/bipolar/main.go            entry point
+internal/shell/shell.go        shell detection, rc file management, embedded function
 internal/profiles/profiles.go  config file parse / save / validate
-internal/ui/menu.go          interactive menus
-internal/ui/filepicker.go    SSH key file browser
+internal/ui/menu.go            interactive menus
+internal/ui/filepicker.go      SSH key file browser
+docs/index.html                no-install web installer (client-side, self-contained)
+scripts/sync-web.mjs           regenerates the block embedded in docs/index.html
 ```
 
 ```sh
-make tidy   # go mod tidy
-make lint   # go vet
-make build  # compile for current platform
+make tidy      # go mod tidy
+make lint      # go vet
+make build     # compile for current platform
+make sync-web  # re-embed the shell block into the web installer
+make check-web # verify the web installer is in sync (used by CI)
 ```
+
+### Keeping the web installer in sync
+
+`docs/index.html` embeds the canonical `git-dispatch` block from
+`internal/shell/shell.go`. **If you change that block, run `make sync-web`** and
+commit the updated `docs/index.html`. CI runs `make check-web` and fails if the
+two have drifted, so the web installer and the binary always emit identical code.
+
+### Deploying the web installer
+
+The site is served from the `docs/` folder by GitHub Pages via
+[`.github/workflows/pages.yml`](.github/workflows/pages.yml). To enable it once:
+**Settings → Pages → Build and deployment → Source: GitHub Actions.** After that,
+every push to `main` that touches `docs/` redeploys automatically to
+`https://scicom-ai-enterprise-organization.github.io/git-bipolar/`.
 
 ---
 

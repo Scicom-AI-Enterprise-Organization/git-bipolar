@@ -27,3 +27,13 @@ jobs:
 
       - name: Build (current platform)
         run: make build
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Ensure the no-install web page (docs/index.html) still embeds the
+      # current shell block. If this fails, run `make sync-web` and commit.
+      - name: Web installer in sync
+        run: make check-web

@@ -5,7 +5,7 @@ BUILD_DIR := dist
 
 GOFILES := $(shell find . -name '*.go' -not -path './vendor/*')
 
-.PHONY: build build-all clean tidy lint release tag
+.PHONY: build build-all clean tidy lint release tag sync-web check-web
 
 # ── Local build ───────────────────────────────────────────────────────────────
 
@@ -78,6 +78,19 @@ tidy:
 
 lint:
 	go vet ./...
+
+# ── Web installer (docs/) ─────────────────────────────────────────────────────
+#
+# The no-install web page (docs/index.html) embeds the canonical shell block
+# from internal/shell/shell.go. Re-run this whenever that block changes so the
+# web installer and the binary stay byte-for-byte identical.
+
+sync-web:
+	node scripts/sync-web.mjs
+
+# Used in CI to fail if docs/index.html has drifted from the Go source.
+check-web:
+	node scripts/sync-web.mjs --check
 
 clean:
 	rm -rf $(BUILD_DIR)
