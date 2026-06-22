@@ -11,6 +11,10 @@ import (
 type Profile struct {
 	Name       string
 	KeyFile    string
+	GitName    string
+	GitEmail   string
+	Sign       bool
+	SignKey    string
 	OrgPattern string
 }
 
@@ -42,6 +46,18 @@ func Load(path string) ([]Profile, error) {
 		case strings.HasPrefix(line, "key_file=") && current != nil:
 			current.KeyFile = strings.TrimSpace(strings.TrimPrefix(line, "key_file="))
 
+		case strings.HasPrefix(line, "git_name=") && current != nil:
+			current.GitName = strings.TrimSpace(strings.TrimPrefix(line, "git_name="))
+
+		case strings.HasPrefix(line, "git_email=") && current != nil:
+			current.GitEmail = strings.TrimSpace(strings.TrimPrefix(line, "git_email="))
+
+		case strings.HasPrefix(line, "sign=") && current != nil:
+			current.Sign = strings.EqualFold(strings.TrimSpace(strings.TrimPrefix(line, "sign=")), "true")
+
+		case strings.HasPrefix(line, "sign_key=") && current != nil:
+			current.SignKey = strings.TrimSpace(strings.TrimPrefix(line, "sign_key="))
+
 		case strings.HasPrefix(line, "org_pattern=") && current != nil:
 			current.OrgPattern = strings.TrimSpace(strings.TrimPrefix(line, "org_pattern="))
 		}
@@ -60,6 +76,18 @@ func Save(path string, profs []Profile) error {
 	for i, p := range profs {
 		sb.WriteString(fmt.Sprintf("[%s]\n", p.Name))
 		sb.WriteString(fmt.Sprintf("key_file=%s\n", p.KeyFile))
+		if p.GitName != "" {
+			sb.WriteString(fmt.Sprintf("git_name=%s\n", p.GitName))
+		}
+		if p.GitEmail != "" {
+			sb.WriteString(fmt.Sprintf("git_email=%s\n", p.GitEmail))
+		}
+		if p.Sign {
+			sb.WriteString("sign=true\n")
+			if p.SignKey != "" {
+				sb.WriteString(fmt.Sprintf("sign_key=%s\n", p.SignKey))
+			}
+		}
 		sb.WriteString(fmt.Sprintf("org_pattern=%s\n", p.OrgPattern))
 		if i < len(profs)-1 {
 			sb.WriteString("\n")
@@ -81,6 +109,9 @@ func ValidateSyntax(path string) (ok bool, issues []string) {
 		}
 		if p.OrgPattern == "" {
 			issues = append(issues, fmt.Sprintf("[%s] is missing org_pattern", p.Name))
+		}
+		if p.Sign && p.SignKey == "" {
+			issues = append(issues, fmt.Sprintf("[%s] has signing enabled but no sign_key", p.Name))
 		}
 	}
 	return len(issues) == 0, issues

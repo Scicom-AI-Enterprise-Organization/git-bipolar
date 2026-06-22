@@ -79,9 +79,17 @@ func runConfigureProfiles() error {
 		}
 
 		// Build the menu: one entry per profile, then add, then back.
+		// Each entry shows its commit identity (if set) and a 🔏 signing marker.
 		options := []string{}
 		for _, p := range profs {
-			options = append(options, fmt.Sprintf("[%s]", p.Name))
+			label := fmt.Sprintf("[%s]", p.Name)
+			if id := identityHint(p); id != "" {
+				label += "  " + id
+			}
+			if p.Sign {
+				label += "  🔏"
+			}
+			options = append(options, label)
 		}
 		options = append(options, "+ Add new profile", "Back")
 
@@ -104,17 +112,36 @@ func runConfigureProfiles() error {
 			}
 
 		default:
-			name := strings.TrimPrefix(choice, "[")
-			name = strings.TrimSuffix(name, "]")
+			// Extract the profile name between the brackets, ignoring any
+			// trailing marker (e.g. the 🔏 signing indicator).
+			name := choice
+			if lb := strings.Index(choice, "["); lb >= 0 {
+				if rb := strings.Index(choice[lb:], "]"); rb > 0 {
+					name = choice[lb+1 : lb+rb]
+				}
+			}
 			runProfileSubmenu(confPath, profs, name)
 		}
 	}
 }
 
 func runProfileSubmenu(confPath string, profs []profiles.Profile, name string) {
+	title := fmt.Sprintf("Profile  [%s]", name)
+	for _, p := range profs {
+		if p.Name == name {
+			if id := identityHint(p); id != "" {
+				title += "  " + id
+			}
+			if p.Sign {
+				title += "  🔏 signing enabled"
+			}
+			break
+		}
+	}
+
 	var choice string
 	if err := survey.AskOne(&survey.Select{
-		Message: fmt.Sprintf("Profile  [%s]", name),
+		Message: title,
 		Options: []string{
 			fmt.Sprintf("Edit [%s]", name),
 			fmt.Sprintf("Delete [%s]", name),
@@ -137,6 +164,43 @@ func runProfileSubmenu(confPath string, profs []profiles.Profile, name string) {
 }
 
 
+
+// promptSigning asks whether to enable commit signing and, if so, which key to
+// sign with. keyFile is the profile's SSH auth key, offered as the default
+// signing key. defaultEnabled / defaultReuse seed the prompts when editing.
+// Returns (enabled, signKey, err); err is ErrCancelled if the user aborts.
+func promptSigning(keyFile string, defaultEnabled, defaultReuse bool) (bool, string, error) {
+	var enable bool
+	if err := survey.AskOne(&survey.Confirm{
+		Message: "Enable commit signing for this profile?",
+		Default: defaultEnabled,
+		Help:    "Signs commits and tags with an SSH key (git's SSH signing, requires git 2.34+).",
+	}, &enable); err != nil {
+		return false, "", ErrCancelled
+	}
+	if !enable {
+		return false, "", nil
+	}
+
+	var reuse bool
+	if err := survey.AskOne(&survey.Confirm{
+		Message: fmt.Sprintf("Sign with this profile's SSH key? (%s)", keyFile),
+		Default: defaultReuse,
+		Help:    "Choose No to pick a different key (e.g. a dedicated signing key).",
+	}, &reuse); err != nil {
+		return false, "", ErrCancelled
+	}
+	if reuse {
+		return true, keyFile, nil
+	}
+
+	fmt.Println("\nSelect signing key file:")
+	picked, err := PickFile(sshDir())
+	if err != nil {
+		return false, "", ErrCancelled
+	}
+	return true, toTildePath(picked), nil
+}
 
 func addProfile(confPath string, profs []profiles.Profile) error {
 	fmt.Println()
@@ -172,9 +236,34 @@ func addProfile(confPath string, profs []profiles.Profile) error {
 	}
 	keyFile = toTildePath(keyFile)
 
+	var gitName string
+	if err := survey.AskOne(&survey.Input{
+		Message: "Git user.name (optional):",
+		Help:    "Name used for commits under this profile. Leave blank to keep global config.",
+	}, &gitName); err != nil {
+		return ErrCancelled
+	}
+
+	var gitEmail string
+	if err := survey.AskOne(&survey.Input{
+		Message: "Git user.email (optional):",
+		Help:    "Email used for commits under this profile. Leave blank to keep global config.",
+	}, &gitEmail); err != nil {
+		return ErrCancelled
+	}
+
+	sign, signKey, err := promptSigning(keyFile, false, true)
+	if err != nil {
+		return err
+	}
+
 	newProf := profiles.Profile{
 		Name:       name,
 		KeyFile:    keyFile,
+		GitName:    strings.TrimSpace(gitName),
+		GitEmail:   strings.TrimSpace(gitEmail),
+		Sign:       sign,
+		SignKey:    signKey,
 		OrgPattern: strings.TrimSpace(orgPattern),
 	}
 
@@ -238,9 +327,37 @@ func editProfile(confPath string, profs []profiles.Profile, name string) error {
 		keyFile = toTildePath(picked)
 	}
 
+	var gitName string
+	if err := survey.AskOne(&survey.Input{
+		Message: "Git user.name (optional):",
+		Default: p.GitName,
+		Help:    "Name used for commits under this profile. Leave blank to keep global config.",
+	}, &gitName); err != nil {
+		return ErrCancelled
+	}
+
+	var gitEmail string
+	if err := survey.AskOne(&survey.Input{
+		Message: "Git user.email (optional):",
+		Default: p.GitEmail,
+		Help:    "Email used for commits under this profile. Leave blank to keep global config.",
+	}, &gitEmail); err != nil {
+		return ErrCancelled
+	}
+
+	defaultReuse := p.SignKey == "" || p.SignKey == p.KeyFile
+	sign, signKey, err := promptSigning(keyFile, p.Sign, defaultReuse)
+	if err != nil {
+		return err
+	}
+
 	profs[idx] = profiles.Profile{
 		Name:       strings.TrimSpace(newName),
 		KeyFile:    keyFile,
+		GitName:    strings.TrimSpace(gitName),
+		GitEmail:   strings.TrimSpace(gitEmail),
+		Sign:       sign,
+		SignKey:    signKey,
 		OrgPattern: strings.TrimSpace(orgPattern),
 	}
 
@@ -410,6 +527,20 @@ func runUninstallAliases(rcFile string) {
 func sshDir() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".ssh")
+}
+
+// identityHint returns a compact one-line commit identity for menu display,
+// or "" if the profile keeps the global git config.
+func identityHint(p profiles.Profile) string {
+	switch {
+	case p.GitName != "" && p.GitEmail != "":
+		return fmt.Sprintf("%s <%s>", p.GitName, p.GitEmail)
+	case p.GitEmail != "":
+		return p.GitEmail
+	case p.GitName != "":
+		return p.GitName
+	}
+	return ""
 }
 
 // toTildePath replaces the home directory prefix with "~".

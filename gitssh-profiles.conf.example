@@ -1,5 +1,11 @@
 [ProfileName]
 key_file=~/.ssh/path/to/keyfile/private
+# Optional: commit identity for this profile (overrides local + global git config)
+git_name=Your Name
+git_email=you@example.com
+# Optional: SSH commit signing (opt-in). sign_key defaults to key_file above.
+sign=true
+sign_key=~/.ssh/path/to/keyfile/private
 org_pattern=<github org/github username pattern in regex, or just the actual string>
 
 [Default]

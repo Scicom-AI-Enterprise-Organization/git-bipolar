@@ -139,6 +139,8 @@ Select **Configure Profiles → + Add new profile** and fill in three fields:
 | **Profile name** | A short label, e.g. `Work` or `PersonalGH` |
 | **Org / username pattern** | Plain string or regex matching the GitHub org or username |
 | **SSH key file** | Navigate to your private key with the built-in file browser |
+| **Git user.name / user.email** *(optional)* | Commit identity for this profile. Injected with `git -c …`, which overrides both local `.git/config` and global `~/.gitconfig`. Leave blank to keep your global identity. |
+| **Commit signing** *(optional, opt-in)* | Sign commits and tags with an SSH key. Defaults to your profile's SSH key, or pick a different one. See [Commit signing](#commit-signing). |
 
 The pattern is matched against the org name extracted from the remote URL. Examples:
 
@@ -157,6 +159,10 @@ Profiles are stored in `~/.git_profiles.conf` in a simple INI format:
 ```ini
 [Work]
 key_file=~/.ssh/id_ed25519_work
+git_name=Jane Work
+git_email=jane@acme-corp.com
+sign=true
+sign_key=~/.ssh/id_ed25519_work
 org_pattern=acme-corp
 
 [PersonalGH]
@@ -164,7 +170,40 @@ key_file=~/.ssh/id_ed25519_personal
 org_pattern=my-github-username
 ```
 
-You can edit this file directly — bipolar will pick up changes immediately (no reload needed).
+`git_name`, `git_email`, `sign`, and `sign_key` are all optional. You can edit this file directly — bipolar will pick up changes immediately (no reload needed).
+
+---
+
+## Commit signing
+
+Each profile can optionally **sign commits and tags** using [git's SSH signing](https://git-scm.com/docs/git-config#Documentation/git-config.txt-gpgformat) (requires git **2.34+**). It's **opt-in** — disabled unless you enable it on a profile.
+
+Enable it when adding or editing a profile:
+
+```
+? Enable commit signing for this profile? Yes
+? Sign with this profile's SSH key? (~/.ssh/id_ed25519_work) Yes
+```
+
+Accept the default to sign with the profile's own SSH key, or choose **No** to pick a dedicated signing key from the file browser. Signed profiles are marked with a 🔏 in the menu.
+
+When a signed profile matches, bipolar injects the signing config for that one command and prints:
+
+```
+[Git-Bipolar] 🔏 Signing commit with ~/.ssh/id_ed25519_work
+```
+
+Under the hood it runs the equivalent of:
+
+```sh
+git -c gpg.format=ssh \
+    -c user.signingkey=~/.ssh/id_ed25519_work \
+    -c commit.gpgsign=true \
+    -c tag.gpgsign=true \
+    commit ...
+```
+
+> To **verify** signatures locally (e.g. `git log --show-signature`), add the key to a `~/.ssh/allowed_signers` file and set `gpg.ssh.allowedSignersFile`. This is only needed for verification — signing works without it.
 
 ---
 
