@@ -164,6 +164,7 @@ Select **Configure Profiles → + Add new profile** and fill in three fields:
 | **Org / username pattern** | Plain string or regex matching the GitHub org or username |
 | **SSH key file** | Navigate to your private key with the built-in file browser |
 | **Git user.name / user.email** *(optional)* | Commit identity for this profile. Injected with `git -c …`, which overrides both local `.git/config` and global `~/.gitconfig`. Leave blank to keep your global identity. |
+| **GitHub username for HTTPS** *(optional)* | An account already logged in with GitHub CLI; selects HTTPS credentials without switching the active account. |
 | **Commit signing** *(optional, opt-in)* | Sign commits and tags with an SSH key. Defaults to your profile's SSH key, or pick a different one. See [Commit signing](#commit-signing). |
 
 The pattern is matched against the org name extracted from the remote URL. Examples:
@@ -194,9 +195,24 @@ key_file=~/.ssh/id_ed25519_personal
 org_pattern=my-github-username
 ```
 
-`git_name`, `git_email`, `sign`, and `sign_key` are all optional. You can edit this file directly — bipolar will pick up changes immediately (no reload needed).
+`git_name`, `git_email`, `gh_user`, `sign`, and `sign_key` are all optional. You can edit this file directly — bipolar will pick up changes immediately (no reload needed).
 
 ---
+
+## GitHub HTTPS authentication
+
+Commit identity (`git_name` / `git_email`) does not select the GitHub account used to access a repository. For HTTPS remotes on `github.com`, set `gh_user` on the matching profile:
+
+```ini
+[Personal]
+key_file=~/.ssh/id_ed25519_personal
+gh_user=my-personal-account
+org_pattern=^my-personal-account$
+```
+
+Log that account in with `gh auth login` first. Bipolar reads its stored token with `gh auth token --hostname github.com --user ...` and applies it only to the Git child process, using GitHub CLI's credential helper. It does not run `gh auth switch`, change the globally active account, or store tokens in the profile or remote URL. A configured account overrides inherited `GH_TOKEN` / `GITHUB_TOKEN` values for that Git command; if its token is missing, the operation stops rather than trying another account.
+
+The account is available in both the CLI profile editor and web configurator. Existing profiles without `gh_user`, other HTTPS hosts and SSH remotes keep their existing authentication behavior. After upgrading the binary, use **Repair Bipolar** and reload your shell to update an existing dispatcher. The web installer's generated script skips dispatcher blocks already installed; existing users should update through Repair or replace their managed block with the new preview.
 
 ## Commit signing
 

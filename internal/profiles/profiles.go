@@ -13,6 +13,7 @@ type Profile struct {
 	KeyFile    string
 	GitName    string
 	GitEmail   string
+	GHUser     string
 	Sign       bool
 	SignKey    string
 	OrgPattern string
@@ -52,6 +53,9 @@ func Load(path string) ([]Profile, error) {
 		case strings.HasPrefix(line, "git_email=") && current != nil:
 			current.GitEmail = strings.TrimSpace(strings.TrimPrefix(line, "git_email="))
 
+		case strings.HasPrefix(line, "gh_user=") && current != nil:
+			current.GHUser = strings.TrimSpace(strings.TrimPrefix(line, "gh_user="))
+
 		case strings.HasPrefix(line, "sign=") && current != nil:
 			current.Sign = strings.EqualFold(strings.TrimSpace(strings.TrimPrefix(line, "sign=")), "true")
 
@@ -81,6 +85,9 @@ func Save(path string, profs []Profile) error {
 		}
 		if p.GitEmail != "" {
 			sb.WriteString(fmt.Sprintf("git_email=%s\n", p.GitEmail))
+		}
+		if p.GHUser != "" {
+			sb.WriteString(fmt.Sprintf("gh_user=%s\n", p.GHUser))
 		}
 		if p.Sign {
 			sb.WriteString("sign=true\n")
