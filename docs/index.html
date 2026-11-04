@@ -283,32 +283,39 @@
 <script type="text/plain" id="bipolar-block">
 ### Managed by Bipolar ###
 git-dispatch() {
-    local network_cmds="push pull fetch clone"
+    local network_cmds="push pull fetch clone ls-remote"
     local conf_file="$HOME/.git_profiles.conf"
     local remote_url=""
 
     # Identify the URL
     if [[ "$1" == "clone" ]]; then
-        for arg in "$@"; do [[ "$arg" =~ ":" || "$arg" =~ "/" ]] && remote_url="$arg"; done
+        for arg in "$@"; do
+            if [[ "$arg" =~ ^https?:// || "$arg" =~ ^ssh:// || "$arg" =~ ^[^/]+@[^:]+: ]]; then
+                remote_url="$arg"
+                break
+            fi
+        done
     else
         remote_url=$(command git config --get remote.origin.url 2>/dev/null)
     fi
 
     if [[ -n "$remote_url" ]] && [[ -f "$conf_file" ]]; then
         local org_name=$(echo "$remote_url" | sed -E 's/.*[:\/]([^\/]+)\/[^\/]+$/\1/')
-        local current_profile="" key_file="" git_name="" git_email="" sign="" sign_key="" org_pattern=""
+        local current_profile="" key_file="" git_name="" git_email="" gh_user="" sign="" sign_key="" org_pattern=""
 
         # Parse with compatibility for Zsh/Bash
         while read -r line || [[ -n "$line" ]]; do
             if echo "$line" | grep -q "^\[.*\]$"; then
                 current_profile=$(echo "$line" | tr -d '[]')
-                key_file="" git_name="" git_email="" sign="" sign_key="" org_pattern=""
+                key_file="" git_name="" git_email="" gh_user="" sign="" sign_key="" org_pattern=""
             elif echo "$line" | grep -q "^key_file="; then
                 key_file=$(echo "$line" | cut -d'=' -f2- | xargs)
             elif echo "$line" | grep -q "^git_name="; then
                 git_name=$(echo "$line" | cut -d'=' -f2-)
             elif echo "$line" | grep -q "^git_email="; then
                 git_email=$(echo "$line" | cut -d'=' -f2-)
+            elif echo "$line" | grep -q "^gh_user="; then
+                gh_user=$(echo "$line" | cut -d'=' -f2- | xargs)
             elif echo "$line" | grep -q "^sign="; then
                 sign=$(echo "$line" | cut -d'=' -f2- | xargs)
             elif echo "$line" | grep -q "^sign_key="; then
@@ -337,6 +344,21 @@ git-dispatch() {
                             commit|tag|merge|rebase|cherry-pick|revert|am|commit-tree)
                                 echo -e "\033[0;35m[Git-Bipolar]\033[0m \033[0;32m🔏 Signing commit with\033[0m \033[1m$sign_key\033[0m" ;;
                         esac
+                    fi
+
+                    # GitHub HTTPS auth is separate from commit identity. Resolve the
+                    # configured account without changing gh's globally active user.
+                    if [[ " $network_cmds " =~ " $1 " ]] && [[ "$remote_url" =~ ^https://github[.]com/ ]] && [[ -n "$gh_user" ]]; then
+                        local gh_token
+                        if ! gh_token=$(GH_TOKEN= GITHUB_TOKEN= command gh auth token --hostname github.com --user "$gh_user") || [[ -z "$gh_token" ]]; then
+                            printf '[Git-Bipolar] Cannot load GitHub credentials for %s. Run gh auth login for that account.\n' "$gh_user" >&2
+                            return 1
+                        fi
+                        # Reset other helpers so cached credentials cannot win. The
+                        # token stays in the child environment, never Git arguments.
+                        GH_TOKEN="$gh_token" GITHUB_TOKEN= command git "${id_args[@]}" \
+                            -c credential.helper= -c 'credential.https://github.com.helper=!gh auth git-credential' "$@"
+                        return $?
                     fi
 
                     # SSH network commands: inject key + identity
@@ -401,12 +423,12 @@ alias gl='git log --oneline'
   document.getElementById('aliases-preview').textContent = ALIASES || '(aliases not synced)';
 
   // ── State ────────────────────────────────────────────────────────
-  var profiles = [];   // {name, org, key, gname, gemail, sign, signSame, signKey}
+  var profiles = [];   // {name, org, key, gname, gemail, ghUser, sign, signSame, signKey}
   var seq = 0;
 
   function blank(name, org, key){
     return {id:++seq, name:name||'', org:org||'', key:key||'',
-            gname:'', gemail:'', sign:false, signSame:true, signKey:''};
+            gname:'', gemail:'', ghUser:'', sign:false, signSame:true, signKey:''};
   }
 
   // Coerce any stored/parsed object into a well-formed state profile.
@@ -414,7 +436,7 @@ alias gl='git log --oneline'
     o = o || {};
     return {id:++seq,
             name:String(o.name||''), org:String(o.org||''), key:String(o.key||''),
-            gname:String(o.gname||''), gemail:String(o.gemail||''),
+            gname:String(o.gname||''), gemail:String(o.gemail||''), ghUser:String(o.ghUser||''),
             sign:!!o.sign, signSame:o.signSame !== false, signKey:String(o.signKey||'')};
   }
 
@@ -434,7 +456,7 @@ alias gl='git log --oneline'
         aliases: !!document.getElementById('opt-aliases').checked,
         profiles: profiles.map(function(p){
           return {name:p.name, org:p.org, key:p.key, gname:p.gname,
-                  gemail:p.gemail, sign:p.sign, signSame:p.signSame, signKey:p.signKey};
+                  gemail:p.gemail, ghUser:p.ghUser, sign:p.sign, signSame:p.signSame, signKey:p.signKey};
         })
       }));
       setSaved('saved');
@@ -483,6 +505,7 @@ alias gl='git log --oneline'
       b.push('key_file=' + p.key);
       if (p.gname.trim())  b.push('git_name='  + p.gname.trim());
       if (p.gemail.trim()) b.push('git_email=' + p.gemail.trim());
+      if (p.ghUser.trim()) b.push('gh_user=' + p.ghUser.trim());
       if (p.sign){
         b.push('sign=true');
         var sk = p.signSame ? p.key : p.signKey;
@@ -642,6 +665,11 @@ alias gl='git log --oneline'
     grid.appendChild(field('Git <code class="inline-code" style="font-size:11px">user.email</code> <span class="opt">optional</span>',
       p.gemail, function(v){ p.gemail = v; }, 'jane@acme-corp.com'));
 
+    var ghF = field('GitHub username for HTTPS <span class="opt">optional · already logged in with gh</span>',
+      p.ghUser, function(v){ p.ghUser = v; }, 'my-github-username');
+    ghF.classList.add('full');
+    grid.appendChild(ghF);
+
     // Signing
     var signRow = document.createElement('div'); signRow.className = 'sign-row';
     var signLabel = document.createElement('label'); signLabel.className = 'check';
@@ -719,6 +747,7 @@ alias gl='git log --oneline'
         if (k === 'key_file') cur.key = v;
         else if (k === 'git_name') cur.gname = v;
         else if (k === 'git_email') cur.gemail = v;
+        else if (k === 'gh_user') cur.ghUser = v;
         else if (k === 'sign') cur.sign = /^true$/i.test(v);
         else if (k === 'sign_key'){ cur.signKey = v; cur.signSame = false; }
         else if (k === 'org_pattern') cur.org = v;

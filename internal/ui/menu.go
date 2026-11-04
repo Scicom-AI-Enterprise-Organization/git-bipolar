@@ -163,8 +163,6 @@ func runProfileSubmenu(confPath string, profs []profiles.Profile, name string) {
 	}
 }
 
-
-
 // promptSigning asks whether to enable commit signing and, if so, which key to
 // sign with. keyFile is the profile's SSH auth key, offered as the default
 // signing key. defaultEnabled / defaultReuse seed the prompts when editing.
@@ -252,6 +250,14 @@ func addProfile(confPath string, profs []profiles.Profile) error {
 		return ErrCancelled
 	}
 
+	var ghUser string
+	if err := survey.AskOne(&survey.Input{
+		Message: "GitHub username for HTTPS (optional):",
+		Help:    "An account already logged in with gh auth login. Leave blank to use existing credentials.",
+	}, &ghUser); err != nil {
+		return ErrCancelled
+	}
+
 	sign, signKey, err := promptSigning(keyFile, false, true)
 	if err != nil {
 		return err
@@ -262,6 +268,7 @@ func addProfile(confPath string, profs []profiles.Profile) error {
 		KeyFile:    keyFile,
 		GitName:    strings.TrimSpace(gitName),
 		GitEmail:   strings.TrimSpace(gitEmail),
+		GHUser:     strings.TrimSpace(ghUser),
 		Sign:       sign,
 		SignKey:    signKey,
 		OrgPattern: strings.TrimSpace(orgPattern),
@@ -345,6 +352,15 @@ func editProfile(confPath string, profs []profiles.Profile, name string) error {
 		return ErrCancelled
 	}
 
+	var ghUser string
+	if err := survey.AskOne(&survey.Input{
+		Default: p.GHUser,
+		Message: "GitHub username for HTTPS (optional):",
+		Help:    "An account already logged in with gh auth login. Leave blank to use existing credentials.",
+	}, &ghUser); err != nil {
+		return ErrCancelled
+	}
+
 	defaultReuse := p.SignKey == "" || p.SignKey == p.KeyFile
 	sign, signKey, err := promptSigning(keyFile, p.Sign, defaultReuse)
 	if err != nil {
@@ -356,6 +372,7 @@ func editProfile(confPath string, profs []profiles.Profile, name string) error {
 		KeyFile:    keyFile,
 		GitName:    strings.TrimSpace(gitName),
 		GitEmail:   strings.TrimSpace(gitEmail),
+		GHUser:     strings.TrimSpace(ghUser),
 		Sign:       sign,
 		SignKey:    signKey,
 		OrgPattern: strings.TrimSpace(orgPattern),

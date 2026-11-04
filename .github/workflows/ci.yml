@@ -25,6 +25,12 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      - name: Install Zsh for dispatcher tests
+        run: sudo apt-get update && sudo apt-get install -y zsh
+
+      - name: Test
+        run: go test ./...
+
       - name: Build (current platform)
         run: make build
 

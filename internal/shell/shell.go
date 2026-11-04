@@ -12,32 +12,39 @@ const BlockEnd = "### Bipolar End ###"
 
 // shellFunction is the canonical git-dispatch function body, baked into the binary.
 const shellFunction = `git-dispatch() {
-    local network_cmds="push pull fetch clone"
+    local network_cmds="push pull fetch clone ls-remote"
     local conf_file="$HOME/.git_profiles.conf"
     local remote_url=""
 
     # Identify the URL
     if [[ "$1" == "clone" ]]; then
-        for arg in "$@"; do [[ "$arg" =~ ":" || "$arg" =~ "/" ]] && remote_url="$arg"; done
+        for arg in "$@"; do
+            if [[ "$arg" =~ ^https?:// || "$arg" =~ ^ssh:// || "$arg" =~ ^[^/]+@[^:]+: ]]; then
+                remote_url="$arg"
+                break
+            fi
+        done
     else
         remote_url=$(command git config --get remote.origin.url 2>/dev/null)
     fi
 
     if [[ -n "$remote_url" ]] && [[ -f "$conf_file" ]]; then
         local org_name=$(echo "$remote_url" | sed -E 's/.*[:\/]([^\/]+)\/[^\/]+$/\1/')
-        local current_profile="" key_file="" git_name="" git_email="" sign="" sign_key="" org_pattern=""
+        local current_profile="" key_file="" git_name="" git_email="" gh_user="" sign="" sign_key="" org_pattern=""
 
         # Parse with compatibility for Zsh/Bash
         while read -r line || [[ -n "$line" ]]; do
             if echo "$line" | grep -q "^\[.*\]$"; then
                 current_profile=$(echo "$line" | tr -d '[]')
-                key_file="" git_name="" git_email="" sign="" sign_key="" org_pattern=""
+                key_file="" git_name="" git_email="" gh_user="" sign="" sign_key="" org_pattern=""
             elif echo "$line" | grep -q "^key_file="; then
                 key_file=$(echo "$line" | cut -d'=' -f2- | xargs)
             elif echo "$line" | grep -q "^git_name="; then
                 git_name=$(echo "$line" | cut -d'=' -f2-)
             elif echo "$line" | grep -q "^git_email="; then
                 git_email=$(echo "$line" | cut -d'=' -f2-)
+            elif echo "$line" | grep -q "^gh_user="; then
+                gh_user=$(echo "$line" | cut -d'=' -f2- | xargs)
             elif echo "$line" | grep -q "^sign="; then
                 sign=$(echo "$line" | cut -d'=' -f2- | xargs)
             elif echo "$line" | grep -q "^sign_key="; then
@@ -66,6 +73,21 @@ const shellFunction = `git-dispatch() {
                             commit|tag|merge|rebase|cherry-pick|revert|am|commit-tree)
                                 echo -e "\033[0;35m[Git-Bipolar]\033[0m \033[0;32m🔏 Signing commit with\033[0m \033[1m$sign_key\033[0m" ;;
                         esac
+                    fi
+
+                    # GitHub HTTPS auth is separate from commit identity. Resolve the
+                    # configured account without changing gh's globally active user.
+                    if [[ " $network_cmds " =~ " $1 " ]] && [[ "$remote_url" =~ ^https://github[.]com/ ]] && [[ -n "$gh_user" ]]; then
+                        local gh_token
+                        if ! gh_token=$(GH_TOKEN= GITHUB_TOKEN= command gh auth token --hostname github.com --user "$gh_user") || [[ -z "$gh_token" ]]; then
+                            printf '[Git-Bipolar] Cannot load GitHub credentials for %s. Run gh auth login for that account.\n' "$gh_user" >&2
+                            return 1
+                        fi
+                        # Reset other helpers so cached credentials cannot win. The
+                        # token stays in the child environment, never Git arguments.
+                        GH_TOKEN="$gh_token" GITHUB_TOKEN= command git "${id_args[@]}" \
+                            -c credential.helper= -c 'credential.https://github.com.helper=!gh auth git-credential' "$@"
+                        return $?
                     fi
 
                     # SSH network commands: inject key + identity
